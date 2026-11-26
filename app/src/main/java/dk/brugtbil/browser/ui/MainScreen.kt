@@ -75,7 +75,8 @@ fun MainScreen(
       Box(Modifier.fillMaxSize()) {
         hiddenWebView()
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            // Opaque background: the hidden Bilbasen WebView sits right behind this list.
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

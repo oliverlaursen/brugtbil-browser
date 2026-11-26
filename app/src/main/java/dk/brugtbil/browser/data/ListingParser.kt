@@ -16,6 +16,8 @@ data class RawPage(
     val jsonld: List<String> = emptyList(),
     val challenge: Boolean = false,
     val title: String = "",
+    /** location.href of the document the data was read from. */
+    val url: String = "",
 )
 
 @Serializable
@@ -52,7 +54,9 @@ object ListingParser {
                     km = l.km ?: existing.km,
                     fuel = existing.fuel ?: l.fuel,
                     gearbox = existing.gearbox ?: l.gearbox,
-                    imageUrl = existing.imageUrl ?: l.imageUrl,
+                    // JSON-LD photo lists start at the first car photo (no dealer logo).
+                    imageUrl = l.imageUrl ?: existing.imageUrl,
+                    imageCount = maxOf(l.imageCount, existing.imageCount),
                     title = existing.title.ifBlank { l.title },
                 )
             }
@@ -78,6 +82,7 @@ object ListingParser {
             fuel = parseFuel(all),
             gearbox = parseGearbox(all),
             imageUrl = pickImage(card.images),
+            imageCount = card.images.size,
         )
     }
 
@@ -108,13 +113,15 @@ object ListingParser {
     }
 
     /**
-     * Always takes picture number 2 on the card: the first one is usually the dealer's
-     * logo/branding. Falls back to the only picture when a card has just one.
+     * Picks the car photo from a card's pictures. On Bilbasen picture number 1 is the
+     * dealer's logo (alt="Forhandlerlogo"); the extractor already drops images whose alt
+     * text says logo, so the first remaining picture is the car (= picture number 2).
      */
-    fun pickImage(candidates: List<String>): String? {
-        val pictures = candidates.filter { it.startsWith("http") && !it.substringBefore('?').endsWith(".svg", ignoreCase = true) }
-        return pictures.getOrNull(1) ?: pictures.firstOrNull()
-    }
+    fun pickImage(candidates: List<String>): String? =
+        candidates.firstOrNull { it.startsWith("http") && !it.substringBefore('?').endsWith(".svg", ignoreCase = true) }
+
+    /** Number of listings Bilbasen says are on this page (from its JSON-LD ItemList). */
+    fun expectedListings(page: RawPage): Int = page.jsonld.sumOf { fromJsonLd(it).size }
 
     private const val NUM = """\d{1,3}(?:[.\s]\d{3})+|\d+"""
 
@@ -192,6 +199,11 @@ object ListingParser {
             is JsonPrimitive -> m.contentOrNull
             else -> null
         }?.let { v -> v.substringBefore(',').filter { it.isDigit() }.toIntOrNull() }
+        val imageCount = when (val img = o["image"]) {
+            is JsonArray -> img.size
+            null -> 0
+            else -> 1
+        }
         val image = when (val img = o["image"]) {
             is JsonPrimitive -> img.contentOrNull
             is JsonArray -> (img.firstOrNull() as? JsonPrimitive)?.contentOrNull
@@ -205,6 +217,7 @@ object ListingParser {
         return Listing(
             id, url.substringBefore('?'), o.str("name").orEmpty(), make, model, price, year, km,
             fuel = fuel, gearbox = gearbox, imageUrl = image?.takeIf { it.startsWith("http") },
+            imageCount = imageCount,
         )
     }
 

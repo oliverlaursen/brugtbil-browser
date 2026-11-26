@@ -8,14 +8,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dk.brugtbil.browser.data.BilbasenClient
@@ -30,8 +28,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        webView = WebView(this)
+        webView = WebView(this).apply {
+            @Suppress("ClickableViewAccessibility")
+            setOnTouchListener { _, _ -> true } // never react to the user's taps
+            importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
         client = BilbasenClient(webView)
+        // Debug builds: `adb shell am start -n dk.brugtbil.browser/.MainActivity --ei maxPages 2`
+        // limits how many Bilbasen result pages a search loads (handy for quick tests).
+        val maxPages = intent.getIntExtra("maxPages", 0)
+            .takeIf { BuildConfig.DEBUG && it > 0 } ?: MainViewModel.MAX_PAGES
 
         setContent {
             val dark = isSystemInDarkTheme()
@@ -40,16 +46,17 @@ class MainActivity : ComponentActivity() {
                 MainScreen(
                     state = state,
                     onFilters = vm::updateFilters,
-                    onSearch = { vm.search(client) },
+                    onSearch = { vm.search(client, maxPages) },
                     onCancel = vm::cancel,
                     onOpenGroup = { g ->
                         val f = state.filters.copy(brand = g.makeSlug, model = g.modelSlug)
                         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BilbasenUrls.search(f))))
                     },
-                    // The WebView must be attached to the window for pages to render
-                    // reliably, so it lives in the layout at 1dp and fully transparent.
+                    // The WebView needs a real, phone-sized viewport for Bilbasen to draw
+                    // its listing cards, so it fills the screen *behind* the app's own
+                    // (opaque) content and ignores touches.
                     hiddenWebView = {
-                        AndroidView(factory = { webView }, modifier = Modifier.size(1.dp).alpha(0f))
+                        AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
                     },
                 )
             }

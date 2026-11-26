@@ -11,7 +11,7 @@ object ExtractorScript {
         (function() {
           var idRe = /\/brugt\/bil\/[^\/]+\/[^\/]+\/(?:[^?#]*\/)?(\d{5,})\/?(?:[?#].*)?$/;
           function idOf(href) { var m = idRe.exec(href || ''); return m ? m[1] : null; }
-          var out = { cards: [], jsonld: [], challenge: false, title: document.title || '' };
+          var out = { cards: [], jsonld: [], challenge: false, title: document.title || '', url: location.href };
           document.querySelectorAll('script[type="application/ld+json"]').forEach(function(s) {
             out.jsonld.push(s.textContent || '');
           });
@@ -48,6 +48,7 @@ object ExtractorScript {
               return parts[parts.length - 1]; // largest is usually last
             }
             el.querySelectorAll('img').forEach(function(img) {
+              if (/logo|forhandler/i.test(img.getAttribute('alt') || '')) return; // dealer logo
               var src = img.closest('picture') && img.closest('picture').querySelector('source');
               var u = abs(largest(img.getAttribute('srcset'))) || abs(largest(img.getAttribute('data-srcset')))
                    || abs(src && (largest(src.getAttribute('srcset')) || largest(src.getAttribute('data-srcset'))))
@@ -67,4 +68,7 @@ object ExtractorScript {
           return JSON.stringify(out);
         })();
     """.trimIndent()
+
+    /** Scrolls the page one screen down so lazily rendered listing cards appear. */
+    const val SCROLL = "window.scrollBy(0, Math.max(400, window.innerHeight * 0.9)); 'ok'"
 }

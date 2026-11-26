@@ -81,9 +81,9 @@ class BilbasenClient(private val webView: WebView) {
         runCatching {
             val dir = java.io.File(webView.context.cacheDir, "bilbasen-debug").apply { mkdirs() }
             java.io.File(dir, "page-$page.json").writeText(Json.encodeToString(RawPage.serializer(), raw))
-            if (page == 1) {
-                java.io.File(dir, "page-1.url").writeText(webView.url.orEmpty())
-                java.io.File(dir, "page-1.html").writeText(evaluate("document.documentElement.outerHTML"))
+            if (page <= 2) {
+                java.io.File(dir, "page-$page.url").writeText(webView.url.orEmpty())
+                java.io.File(dir, "page-$page.html").writeText(evaluate("document.documentElement.outerHTML"))
             }
         }
     }
@@ -97,22 +97,49 @@ class BilbasenClient(private val webView: WebView) {
         // Don't wait for onPageFinished: on slow connections a stalled tracker or image can
         // delay it long after the listings are on screen. Poll the DOM from the start
         // (the bot check also reloads the page and results render client-side).
-        repeat(120) { // up to ~60 s
+        val wantedPage = pageNumber(url)
+        repeat(180) { // up to ~90 s
             delay(500)
             val page = runCatching { ListingParser.decodePage(evaluate(ExtractorScript.JS)) }.getOrNull()
+                // Ignore reads from the previous page that is still showing while the next loads.
+                ?.takeIf { it.url.isNotEmpty() && pageNumber(it.url) == wantedPage }
             if (page != null) {
                 last = page
-                if (page.cards.isNotEmpty()) {
-                    // Give lazy-rendered cards a moment, then return.
-                    delay(700)
-                    return runCatching { ListingParser.decodePage(evaluate(ExtractorScript.JS)) }
-                        .getOrDefault(page)
-                }
+                if (page.cards.isNotEmpty()) return collectAllCards(page)
                 if (!page.challenge && pageLoaded.isCompleted) stableEmptyPolls++ else stableEmptyPolls = 0
                 if (stableEmptyPolls >= 12) return page // ~6s of a loaded page with no listings
             }
         }
         return last?.takeIf { pageLoaded.isCompleted || it.cards.isNotEmpty() }
+    }
+
+    private fun pageNumber(url: String): Int =
+        Regex("""[?&]page=(\d+)""").find(url)?.groupValues?.get(1)?.toInt() ?: 1
+
+    /**
+     * Bilbasen draws listing cards gradually as the page is scrolled, while its JSON-LD
+     * already names every listing on the page (but without year/km/fuel). Scroll down and
+     * keep reading until every listing has a drawn card, or nothing new appears.
+     */
+    private suspend fun collectAllCards(first: RawPage): RawPage {
+        val cards = LinkedHashMap<String, RawCard>()
+        fun merge(p: RawPage) = p.cards.forEach { c -> cards[c.href.substringBefore('?')] = c }
+        merge(first)
+        var latest = first
+        var stalls = 0
+        for (i in 0 until 60) {
+            val expected = ListingParser.expectedListings(latest)
+            if (expected > 0 && cards.size >= expected) break
+            if (stalls >= 6) break // ~3 s without a new card: assume we have them all
+            evaluate(ExtractorScript.SCROLL)
+            delay(500)
+            val p = runCatching { ListingParser.decodePage(evaluate(ExtractorScript.JS)) }.getOrNull() ?: continue
+            if (p.jsonld.isNotEmpty()) latest = p
+            val before = cards.size
+            merge(p)
+            stalls = if (cards.size > before) 0 else stalls + 1
+        }
+        return latest.copy(cards = cards.values.toList())
     }
 
     private suspend fun evaluate(js: String): String = suspendCancellableCoroutine { cont ->

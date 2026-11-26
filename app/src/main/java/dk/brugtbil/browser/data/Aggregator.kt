@@ -43,7 +43,9 @@ object Aggregator {
                     minKm = kms.minOrNull(),
                     maxKm = kms.maxOrNull(),
                     // One picture per model: the first listing (in Bilbasen's order) that has one.
-                    imageUrl = items.firstNotNullOfOrNull { it.imageUrl },
+                    // Prefer a listing with several photos: single-photo listings are
+                    // often a dealer placeholder or logo rather than the car.
+                    imageUrl = (items.filter { it.imageCount >= 2 } + items).firstNotNullOfOrNull { it.imageUrl },
                     fuels = items.mapNotNull { it.fuel }.toSortedSet(),
                 )
             }

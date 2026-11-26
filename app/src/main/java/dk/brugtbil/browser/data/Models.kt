@@ -15,6 +15,9 @@ data class Listing(
     val fuel: FuelType? = null,
     val gearbox: Gearbox? = null,
     val imageUrl: String? = null,
+    /** How many photos the listing has. Listings with a single "photo" are often a
+     *  dealer placeholder ("fotografen arbejder") or logo, so they rank last for pictures. */
+    val imageCount: Int = 0,
 )
 
 enum class FuelType(val label: String) {

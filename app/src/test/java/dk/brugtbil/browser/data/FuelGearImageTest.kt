@@ -23,22 +23,48 @@ class FuelGearImageTest {
         assertNull(ListingParser.parseGearbox("Ford Fiesta 1,0 EcoBoost"))
     }
 
-    @Test fun alwaysPicksSecondPicture() {
+    /** Card text exactly as captured from bilbasen.dk (innerText of a listing card). */
+    @Test fun parsesRealBilbasenCard() {
         val card = RawCard(
-            href = "https://www.bilbasen.dk/brugt/bil/vw/golf/x/6123456",
-            text = "VW Golf\n2020\n50.000 km\n199.900 kr.",
-            images = listOf(
-                "https://billeder.bilbasen.dk/dealer/brand.jpg",
-                "https://billeder.bilbasen.dk/bilinfo/car1.jpg?class=S640X640",
-                "https://billeder.bilbasen.dk/bilinfo/car2.jpg",
-            ),
+            href = "https://www.bilbasen.dk/brugt/bil/vw/id4/77-1st-max-5d/7048024",
+            title = "VW ID.4",
+            text = "VW ID.4\n77 1ST Max 5d\n204.900\u00a0kr.\n6/2021\n133.000 km\n490 km rækkevidde\nEl\nEsbjerg, Syd- og Sønderjylland",
+            // The extractor has already dropped the dealer logo (alt="Forhandlerlogo").
+            images = listOf("https://billeder.bilbasen.dk/bilinfo/99f2.jpeg?class=S960X960", "https://billeder.bilbasen.dk/bilinfo/f240.jpeg"),
         )
-        assertEquals("https://billeder.bilbasen.dk/bilinfo/car1.jpg?class=S640X640", ListingParser.fromCard(card)!!.imageUrl)
+        val l = ListingParser.fromCard(card)!!
+        assertEquals(204_900, l.price())
+        assertEquals(2021, l.year)
+        assertEquals(133_000, l.km)
+        assertEquals(FuelType.ELECTRIC, l.fuel)
+        assertEquals("https://billeder.bilbasen.dk/bilinfo/99f2.jpeg?class=S960X960", l.imageUrl)
     }
 
-    @Test fun fallsBackToOnlyPicture() {
-        assertEquals("https://x/only.jpg", ListingParser.pickImage(listOf("https://x/only.jpg")))
-        assertEquals("https://x/b.jpg", ListingParser.pickImage(listOf("https://x/a.jpg", "https://x/icon.svg", "https://x/b.jpg")))
+    private fun Listing.price() = priceDkk
+
+    @Test fun jsonLdPhotoWinsOverCardAndCountsPhotos() {
+        val page = RawPage(
+            cards = listOf(RawCard("https://www.bilbasen.dk/brugt/bil/vw/id4/x/7048024", "VW ID.4", "204.900 kr.\n6/2021\n133.000 km", listOf("https://img/card.jpg"))),
+            jsonld = listOf("""{"@type":"ItemList","numberOfItems":44045,"itemListElement":[
+                {"@type":"Product","image":["https://img/ld1.jpg","https://img/ld2.jpg","https://img/ld3.jpg"],"name":"VW ID.4","url":"https://www.bilbasen.dk/brugt/bil/vw/id4/x/7048024","offers":{"@type":"Offer","price":204900}},
+                {"@type":"Product","image":["https://img/only.jpg"],"name":"VW Golf","url":"https://www.bilbasen.dk/brugt/bil/vw/golf/y/7000001","offers":{"@type":"Offer","price":99000}}]}"""),
+        )
+        assertEquals(2, ListingParser.expectedListings(page))
+        val ls = ListingParser.parse(page).associateBy { it.id }
+        assertEquals("https://img/ld1.jpg", ls["7048024"]!!.imageUrl)
+        assertEquals(3, ls["7048024"]!!.imageCount)
+        assertEquals(2021, ls["7048024"]!!.year) // card data kept
+        assertEquals(1, ls["7000001"]!!.imageCount)
+    }
+
+    @Test fun groupPrefersListingWithSeveralPhotos() {
+        fun l(id: Int, img: String, n: Int) = Listing("$id", "u", "", "kia", "ev4", 300_000, 2025, 1000, imageUrl = img, imageCount = n)
+        val g = Aggregator.group(listOf(l(1, "https://img/placeholder.jpg", 1), l(2, "https://img/car.jpg", 12)), SearchFilters()).single()
+        assertEquals("https://img/car.jpg", g.imageUrl)
+    }
+
+    @Test fun pickImageSkipsSvgAndTakesFirstCarPhoto() {
+        assertEquals("https://x/a.jpg", ListingParser.pickImage(listOf("https://x/icon.svg", "https://x/a.jpg", "https://x/b.jpg")))
         assertNull(ListingParser.pickImage(emptyList()))
     }
 
