@@ -3,7 +3,7 @@
 An Android app (Kotlin + Jetpack Compose) for browsing used cars on [Bilbasen](https://www.bilbasen.dk).
 Instead of showing every listing, it shows **one row per car model** with a picture, the **price range**
 and the count, year range, mileage range and fuel types of the listings that match your filters.
-The picture comes from the first matching listing that has one.
+The picture is picture number 2 of the first matching listing that has one (picture 1 is usually the dealer's branding).
 
 ## Filters
 - Brand (Mærke) – dropdown with common brands, or free text

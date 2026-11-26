@@ -31,22 +31,29 @@ object ExtractorScript {
               el = p;
             }
             var heading = el.querySelector('h1,h2,h3,h4');
-            // Image URLs. Images are not downloaded in the WebView and lazy-loading may
-            // only fill data-* attributes, so read every likely attribute.
+            // Image URLs: exactly one entry per <img> element, in page order, so that
+            // "picture number 2" means the 2nd image on the card. Images are not
+            // downloaded in the WebView and lazy-loading may only fill data-*
+            // attributes, so every likely attribute is checked.
             var images = [];
-            function addUrl(u) {
-              if (!u || u.indexOf('data:') === 0) return;
-              try { images.push(new URL(u.trim(), location.href).href); } catch (e) {}
+            function abs(u) {
+              if (!u) return null;
+              u = u.trim();
+              if (!u || u.indexOf('data:') === 0) return null;
+              try { return new URL(u, location.href).href; } catch (e) { return null; }
             }
-            function addSrcset(ss) {
-              if (!ss) return;
+            function largest(ss) {
+              if (!ss) return null;
               var parts = ss.split(',').map(function(p) { return p.trim().split(' ')[0]; });
-              addUrl(parts[parts.length - 1]); // largest is usually last
+              return parts[parts.length - 1]; // largest is usually last
             }
-            el.querySelectorAll('img, source').forEach(function(img) {
-              addSrcset(img.getAttribute('srcset')); addSrcset(img.getAttribute('data-srcset'));
-              addUrl(img.getAttribute('src')); addUrl(img.getAttribute('data-src'));
-              addUrl(img.getAttribute('data-lazy-src'));
+            el.querySelectorAll('img').forEach(function(img) {
+              var src = img.closest('picture') && img.closest('picture').querySelector('source');
+              var u = abs(largest(img.getAttribute('srcset'))) || abs(largest(img.getAttribute('data-srcset')))
+                   || abs(src && (largest(src.getAttribute('srcset')) || largest(src.getAttribute('data-srcset'))))
+                   || abs(img.getAttribute('src')) || abs(img.getAttribute('data-src'))
+                   || abs(img.getAttribute('data-lazy-src'));
+              if (u && images.indexOf(u) < 0) images.push(u);
             });
             out.cards.push({
               href: a.href,

@@ -23,16 +23,23 @@ class FuelGearImageTest {
         assertNull(ListingParser.parseGearbox("Ford Fiesta 1,0 EcoBoost"))
     }
 
-    @Test fun picksCarImageNotLogo() {
+    @Test fun alwaysPicksSecondPicture() {
         val card = RawCard(
             href = "https://www.bilbasen.dk/brugt/bil/vw/golf/x/6123456",
             text = "VW Golf\n2020\n50.000 km\n199.900 kr.",
             images = listOf(
-                "https://cdn.example.dk/dealer-logo.png",
-                "https://billeder.bilbasen.dk/bilinfo/abc.jpg?class=S640X640",
+                "https://billeder.bilbasen.dk/dealer/brand.jpg",
+                "https://billeder.bilbasen.dk/bilinfo/car1.jpg?class=S640X640",
+                "https://billeder.bilbasen.dk/bilinfo/car2.jpg",
             ),
         )
-        assertEquals("https://billeder.bilbasen.dk/bilinfo/abc.jpg?class=S640X640", ListingParser.fromCard(card)!!.imageUrl)
+        assertEquals("https://billeder.bilbasen.dk/bilinfo/car1.jpg?class=S640X640", ListingParser.fromCard(card)!!.imageUrl)
+    }
+
+    @Test fun fallsBackToOnlyPicture() {
+        assertEquals("https://x/only.jpg", ListingParser.pickImage(listOf("https://x/only.jpg")))
+        assertEquals("https://x/b.jpg", ListingParser.pickImage(listOf("https://x/a.jpg", "https://x/icon.svg", "https://x/b.jpg")))
+        assertNull(ListingParser.pickImage(emptyList()))
     }
 
     @Test fun filtersOnFuelGearboxAndPriceAndKeepsOneImage() {

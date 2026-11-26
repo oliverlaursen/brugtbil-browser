@@ -107,10 +107,14 @@ object ListingParser {
         else -> null
     }
 
-    private val notCarImage = Regex("""(logo|icon|sprite|placeholder|avatar|badge|\.svg)""", RegexOption.IGNORE_CASE)
-
-    fun pickImage(candidates: List<String>): String? =
-        candidates.firstOrNull { it.startsWith("http") && !notCarImage.containsMatchIn(it) }
+    /**
+     * Always takes picture number 2 on the card: the first one is usually the dealer's
+     * logo/branding. Falls back to the only picture when a card has just one.
+     */
+    fun pickImage(candidates: List<String>): String? {
+        val pictures = candidates.filter { it.startsWith("http") && !it.substringBefore('?').endsWith(".svg", ignoreCase = true) }
+        return pictures.getOrNull(1) ?: pictures.firstOrNull()
+    }
 
     private const val NUM = """\d{1,3}(?:[.\s]\d{3})+|\d+"""
 
