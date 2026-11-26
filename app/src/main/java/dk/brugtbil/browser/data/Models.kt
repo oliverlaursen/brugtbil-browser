@@ -82,4 +82,16 @@ object Slugs {
 
     /** Compares slugs loosely so "id.3", "id-3" and "id3" match. */
     fun loose(s: String): String = s.lowercase().filter { it.isLetterOrDigit() }
+
+    private val generation = Regex("""^(i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|mk\d+)$""")
+
+    /**
+     * Strips trailing generation markers so "golf-viii", "golf-vii" and "golf" all become
+     * one model ("golf"). At least one token is always kept.
+     */
+    fun baseModel(modelSlug: String): String {
+        val parts = modelSlug.lowercase().split('-').toMutableList()
+        while (parts.size > 1 && generation.matches(parts.last())) parts.removeAt(parts.size - 1)
+        return parts.joinToString("-")
+    }
 }

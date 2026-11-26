@@ -50,3 +50,18 @@ class AggregatorTest {
         )
     }
 }
+
+class ModelGroupingTest {
+    @Test fun generationsMergeIntoOneModel() {
+        assertEquals("golf", Slugs.baseModel("golf-viii"))
+        assertEquals("golf", Slugs.baseModel("golf-vii"))
+        assertEquals("e-golf", Slugs.baseModel("e-golf-vii"))
+        assertEquals("v-klasse", Slugs.baseModel("v-klasse"))
+        assertEquals("x", Slugs.baseModel("x"))
+        fun l(id: Int, model: String, price: Int) = Listing("$id", "u", "", "vw", model, price, 2020, 1)
+        val g = Aggregator.group(listOf(l(1, "golf-viii", 200_000), l(2, "golf-vii", 120_000)), SearchFilters()).single()
+        assertEquals("VW Golf", g.displayName)
+        assertEquals(2, g.count)
+        assertEquals(120_000, g.minPrice)
+    }
+}

@@ -25,7 +25,7 @@ object Aggregator {
             .asSequence()
             .filter { it.priceDkk != null && it.makeSlug != null && it.modelSlug != null }
             .filter { matches(it, f) }
-            .groupBy { it.makeSlug!! to it.modelSlug!! }
+            .groupBy { it.makeSlug!! to Slugs.baseModel(it.modelSlug!!) }
             .map { (key, items) ->
                 val (make, model) = key
                 val prices = items.mapNotNull { it.priceDkk }

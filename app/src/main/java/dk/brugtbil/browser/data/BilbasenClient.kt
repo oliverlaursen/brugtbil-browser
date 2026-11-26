@@ -9,7 +9,6 @@ import android.webkit.WebViewClient
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlin.coroutines.resume
@@ -64,6 +63,7 @@ class BilbasenClient(private val webView: WebView) {
                 if (page == 1) throw BilbasenException("Bilbasen viser en robot-kontrol. Prøv igen om lidt.")
                 break
             }
+            if (dk.brugtbil.browser.BuildConfig.DEBUG) dumpForDebugging(page, raw)
             val before = all.size
             ListingParser.parse(raw).forEach { all.putIfAbsent(it.id, it) }
             onProgress(page, all.size)
@@ -72,15 +72,32 @@ class BilbasenClient(private val webView: WebView) {
         return all.values.toList()
     }
 
+    /**
+     * Debug builds only: saves what each page yielded (and page 1's full HTML) to the app's
+     * cache dir, so parsing can be checked against Bilbasen's real markup with
+     * `adb shell run-as dk.brugtbil.browser ls cache/bilbasen-debug`.
+     */
+    private suspend fun dumpForDebugging(page: Int, raw: RawPage) {
+        runCatching {
+            val dir = java.io.File(webView.context.cacheDir, "bilbasen-debug").apply { mkdirs() }
+            java.io.File(dir, "page-$page.json").writeText(Json.encodeToString(RawPage.serializer(), raw))
+            if (page == 1) {
+                java.io.File(dir, "page-1.url").writeText(webView.url.orEmpty())
+                java.io.File(dir, "page-1.html").writeText(evaluate("document.documentElement.outerHTML"))
+            }
+        }
+    }
+
     /** Loads [url] and polls the DOM until listings show up (or the page clearly has none). */
     private suspend fun loadPage(url: String): RawPage? {
         pageLoaded = CompletableDeferred()
         webView.loadUrl(url)
-        withTimeoutOrNull(30_000) { pageLoaded.await() } ?: return null
         var last: RawPage? = null
         var stableEmptyPolls = 0
-        // The bot check reloads the page and results render client-side, so poll.
-        repeat(40) {
+        // Don't wait for onPageFinished: on slow connections a stalled tracker or image can
+        // delay it long after the listings are on screen. Poll the DOM from the start
+        // (the bot check also reloads the page and results render client-side).
+        repeat(120) { // up to ~60 s
             delay(500)
             val page = runCatching { ListingParser.decodePage(evaluate(ExtractorScript.JS)) }.getOrNull()
             if (page != null) {
@@ -95,7 +112,7 @@ class BilbasenClient(private val webView: WebView) {
                 if (stableEmptyPolls >= 12) return page // ~6s of a loaded page with no listings
             }
         }
-        return last
+        return last?.takeIf { pageLoaded.isCompleted || it.cards.isNotEmpty() }
     }
 
     private suspend fun evaluate(js: String): String = suspendCancellableCoroutine { cont ->
