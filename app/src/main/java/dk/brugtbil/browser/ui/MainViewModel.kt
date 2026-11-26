@@ -28,10 +28,17 @@ class MainViewModel : ViewModel() {
     val state: StateFlow<UiState> = _state
 
     private var listings: List<Listing> = emptyList()
+    private var lastSearch: SearchFilters? = null
     private var job: Job? = null
 
     fun updateFilters(transform: (SearchFilters) -> SearchFilters) {
-        _state.update { it.copy(filters = transform(it.filters)) }
+        _state.update { s ->
+            val f = transform(s.filters)
+            // Fuel and gearbox are filtered on the device: re-group the downloaded
+            // listings right away instead of waiting for a new search.
+            val instant = !s.loading && lastSearch?.withoutLocalOnly() == f.withoutLocalOnly()
+            if (instant) s.copy(filters = f, groups = Aggregator.group(listings, f)) else s.copy(filters = f)
+        }
     }
 
     fun search(client: BilbasenClient, maxPages: Int = MAX_PAGES) {
@@ -48,9 +55,13 @@ class MainViewModel : ViewModel() {
                         loading = false,
                         searched = true,
                         listingsScanned = listings.size,
-                        groups = Aggregator.group(listings, filters),
+                        // Pick up fuel/gearbox changes made while loading.
+                        groups = Aggregator.group(
+                            listings, filters.copy(fuels = it.filters.fuels, gearbox = it.filters.gearbox),
+                        ),
                     )
                 }
+                lastSearch = filters
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {

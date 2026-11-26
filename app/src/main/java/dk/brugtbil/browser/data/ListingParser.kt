@@ -19,7 +19,13 @@ data class RawPage(
 )
 
 @Serializable
-data class RawCard(val href: String, val title: String = "", val text: String = "")
+data class RawCard(
+    val href: String,
+    val title: String = "",
+    val text: String = "",
+    /** Candidate image URLs found inside the card, in document order. */
+    val images: List<String> = emptyList(),
+)
 
 /**
  * Turns the raw page dump into [Listing]s. Two sources are combined:
@@ -44,6 +50,9 @@ object ListingParser {
                     priceDkk = l.priceDkk ?: existing.priceDkk,
                     year = l.year ?: existing.year,
                     km = l.km ?: existing.km,
+                    fuel = existing.fuel ?: l.fuel,
+                    gearbox = existing.gearbox ?: l.gearbox,
+                    imageUrl = existing.imageUrl ?: l.imageUrl,
                     title = existing.title.ifBlank { l.title },
                 )
             }
@@ -56,6 +65,7 @@ object ListingParser {
     fun fromCard(card: RawCard): Listing? {
         val (make, model, id) = BilbasenUrls.parseListingUrl(card.href) ?: return null
         val text = card.text.replace(' ', ' ')
+        val all = card.title + "\n" + text
         return Listing(
             id = id,
             url = card.href.substringBefore('?'),
@@ -65,8 +75,42 @@ object ListingParser {
             priceDkk = parsePrice(text),
             year = parseYear(text),
             km = parseKm(text),
+            fuel = parseFuel(all),
+            gearbox = parseGearbox(all),
+            imageUrl = pickImage(card.images),
         )
     }
+
+    private val pluginRe = Regex("""\b(plug-?in|phev|e-hybrid|recharge)\b""", RegexOption.IGNORE_CASE)
+    private val hybridRe = Regex("""\b(hybrid|hev|mhev)\b""", RegexOption.IGNORE_CASE)
+    private val electricRe = Regex("""\b(el|electric|elbil|kwh|e-tron|bev)\b""", RegexOption.IGNORE_CASE)
+    private val dieselRe = Regex("""\b(diesel|tdi|crdi|dci|hdi|bluehdi|cdi|multijet|ecoblue)\b""", RegexOption.IGNORE_CASE)
+    private val petrolRe = Regex("""\b(benzin|tsi|tfsi|t-gdi|gdi|puretech|ecoboost|tce|vti)\b""", RegexOption.IGNORE_CASE)
+
+    /** Order matters: "Hybrid (benzin)" is a hybrid, a plug-in often mentions kWh, etc. */
+    fun parseFuel(text: String): FuelType? = when {
+        pluginRe.containsMatchIn(text) -> FuelType.PLUGIN_HYBRID
+        hybridRe.containsMatchIn(text) -> FuelType.HYBRID
+        electricRe.containsMatchIn(text) -> FuelType.ELECTRIC
+        dieselRe.containsMatchIn(text) -> FuelType.DIESEL
+        petrolRe.containsMatchIn(text) -> FuelType.PETROL
+        else -> null
+    }
+
+    private val autoRe = Regex("""\b(automatisk|automatgear|automat|aut|dsg|s[- ]tronic|steptronic|cvt|e-cvt|eat\d|edc|tiptronic|powershift)\b""", RegexOption.IGNORE_CASE)
+    private val manualRe = Regex("""\b(manuel|manuelt)\b""", RegexOption.IGNORE_CASE)
+
+    fun parseGearbox(text: String): Gearbox? = when {
+        manualRe.containsMatchIn(text) -> Gearbox.MANUAL
+        autoRe.containsMatchIn(text) -> Gearbox.AUTOMATIC
+        parseFuel(text) == FuelType.ELECTRIC -> Gearbox.AUTOMATIC // EVs have no manual gearbox
+        else -> null
+    }
+
+    private val notCarImage = Regex("""(logo|icon|sprite|placeholder|avatar|badge|\.svg)""", RegexOption.IGNORE_CASE)
+
+    fun pickImage(candidates: List<String>): String? =
+        candidates.firstOrNull { it.startsWith("http") && !notCarImage.containsMatchIn(it) }
 
     private const val NUM = """\d{1,3}(?:[.\s]\d{3})+|\d+"""
 
@@ -144,7 +188,20 @@ object ListingParser {
             is JsonPrimitive -> m.contentOrNull
             else -> null
         }?.let { v -> v.substringBefore(',').filter { it.isDigit() }.toIntOrNull() }
-        return Listing(id, url.substringBefore('?'), o.str("name").orEmpty(), make, model, price, year, km)
+        val image = when (val img = o["image"]) {
+            is JsonPrimitive -> img.contentOrNull
+            is JsonArray -> (img.firstOrNull() as? JsonPrimitive)?.contentOrNull
+                ?: (img.firstOrNull() as? JsonObject)?.str("url")
+            is JsonObject -> img.str("url") ?: img.str("contentUrl")
+            else -> null
+        }
+        val fuel = (o.str("fuelType") ?: (o["vehicleEngine"] as? JsonObject)?.str("fuelType"))
+            ?.let { parseFuel(it) }
+        val gearbox = o.str("vehicleTransmission")?.let { parseGearbox(it) }
+        return Listing(
+            id, url.substringBefore('?'), o.str("name").orEmpty(), make, model, price, year, km,
+            fuel = fuel, gearbox = gearbox, imageUrl = image?.takeIf { it.startsWith("http") },
+        )
     }
 
     private fun JsonObject.str(key: String): String? =

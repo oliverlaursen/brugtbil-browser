@@ -26,6 +26,8 @@ object BilbasenUrls {
             filters.yearTo?.let { add("yearto" to it.toString()) }
             filters.kmFrom?.let { add("mileagefrom" to it.toString()) }
             filters.kmTo?.let { add("mileageto" to it.toString()) }
+            filters.priceFrom?.let { add("pricefrom" to it.toString()) }
+            filters.priceTo?.let { add("priceto" to it.toString()) }
             if (page > 1) add("page" to page.toString())
         }
         sb.append('?').append(params.joinToString("&") { "${it.first}=${it.second}" })

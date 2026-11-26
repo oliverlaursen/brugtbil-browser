@@ -31,10 +31,28 @@ object ExtractorScript {
               el = p;
             }
             var heading = el.querySelector('h1,h2,h3,h4');
+            // Image URLs. Images are not downloaded in the WebView and lazy-loading may
+            // only fill data-* attributes, so read every likely attribute.
+            var images = [];
+            function addUrl(u) {
+              if (!u || u.indexOf('data:') === 0) return;
+              try { images.push(new URL(u.trim(), location.href).href); } catch (e) {}
+            }
+            function addSrcset(ss) {
+              if (!ss) return;
+              var parts = ss.split(',').map(function(p) { return p.trim().split(' ')[0]; });
+              addUrl(parts[parts.length - 1]); // largest is usually last
+            }
+            el.querySelectorAll('img, source').forEach(function(img) {
+              addSrcset(img.getAttribute('srcset')); addSrcset(img.getAttribute('data-srcset'));
+              addUrl(img.getAttribute('src')); addUrl(img.getAttribute('data-src'));
+              addUrl(img.getAttribute('data-lazy-src'));
+            });
             out.cards.push({
               href: a.href,
               title: (heading && heading.innerText) || a.getAttribute('title') || a.innerText || '',
-              text: el.innerText || ''
+              text: el.innerText || '',
+              images: images
             });
           });
           out.challenge = !!(window.AwsWafIntegration || document.querySelector('#challenge-container'))

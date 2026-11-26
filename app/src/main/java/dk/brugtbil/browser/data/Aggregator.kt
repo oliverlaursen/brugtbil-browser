@@ -13,6 +13,10 @@ object Aggregator {
         if (f.yearTo != null && (l.year == null || l.year > f.yearTo)) return false
         if (f.kmFrom != null && (l.km == null || l.km < f.kmFrom)) return false
         if (f.kmTo != null && (l.km == null || l.km > f.kmTo)) return false
+        if (f.priceFrom != null && (l.priceDkk == null || l.priceDkk < f.priceFrom)) return false
+        if (f.priceTo != null && (l.priceDkk == null || l.priceDkk > f.priceTo)) return false
+        if (f.fuels.isNotEmpty() && (l.fuel == null || l.fuel !in f.fuels)) return false
+        if (f.gearbox != null && (l.gearbox == null || l.gearbox != f.gearbox)) return false
         return true
     }
 
@@ -38,6 +42,9 @@ object Aggregator {
                     maxYear = years.maxOrNull(),
                     minKm = kms.minOrNull(),
                     maxKm = kms.maxOrNull(),
+                    // One picture per model: the first listing (in Bilbasen's order) that has one.
+                    imageUrl = items.firstNotNullOfOrNull { it.imageUrl },
+                    fuels = items.mapNotNull { it.fuel }.toSortedSet(),
                 )
             }
             .sortedWith(compareByDescending<ModelGroup> { it.count }.thenBy { it.displayName })

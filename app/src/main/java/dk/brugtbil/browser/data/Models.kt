@@ -12,7 +12,20 @@ data class Listing(
     val priceDkk: Int?,
     val year: Int?,
     val km: Int?,
+    val fuel: FuelType? = null,
+    val gearbox: Gearbox? = null,
+    val imageUrl: String? = null,
 )
+
+enum class FuelType(val label: String) {
+    PETROL("Benzin"),
+    DIESEL("Diesel"),
+    ELECTRIC("El"),
+    HYBRID("Hybrid"),
+    PLUGIN_HYBRID("Plug-in hybrid"),
+}
+
+enum class Gearbox(val label: String) { AUTOMATIC("Automatisk"), MANUAL("Manuel") }
 
 /** The filters the user can apply. Empty / null values mean "no restriction". */
 data class SearchFilters(
@@ -22,7 +35,16 @@ data class SearchFilters(
     val yearTo: Int? = null,
     val kmFrom: Int? = null,
     val kmTo: Int? = null,
+    val priceFrom: Int? = null,
+    val priceTo: Int? = null,
+    /** Empty = all fuel types. */
+    val fuels: Set<FuelType> = emptySet(),
+    /** null = both. */
+    val gearbox: Gearbox? = null,
 ) {
+    /** Filters that are only applied on the device, so changing them needs no new download. */
+    fun withoutLocalOnly() = copy(fuels = emptySet(), gearbox = null)
+
     val brandSlug: String get() = Slugs.slugify(brand)
     val modelSlug: String get() = Slugs.slugify(model)
 }
@@ -39,6 +61,8 @@ data class ModelGroup(
     val maxYear: Int?,
     val minKm: Int?,
     val maxKm: Int?,
+    val imageUrl: String? = null,
+    val fuels: Set<FuelType> = emptySet(),
 )
 
 object Slugs {

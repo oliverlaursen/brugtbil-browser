@@ -1,7 +1,21 @@
 package dk.brugtbil.browser.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material3.FilterChip
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
+import dk.brugtbil.browser.data.FuelType
+import dk.brugtbil.browser.data.Gearbox
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -100,7 +114,9 @@ fun MainScreen(
 @Composable
 private fun ModelRow(g: ModelGroup, onClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            CarImage(g.imageUrl)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(g.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
@@ -112,12 +128,42 @@ private fun ModelRow(g: ModelGroup, onClick: () -> Unit) {
                     "${g.count} ${if (g.count == 1) "bil" else "biler"}",
                     range(g.minYear, g.maxYear) { it.toString() },
                     range(g.minKm, g.maxKm, ::km),
+                    g.fuels.takeIf { it.isNotEmpty() }?.joinToString("/") { it.label },
                 ).joinToString(" · ")
                 Text(details, style = MaterialTheme.typography.bodySmall)
             }
             Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Åbn på Bilbasen")
         }
     }
+}
+
+@Composable
+private fun CarImage(url: String?) {
+    val shape = RoundedCornerShape(8.dp)
+    val modifier = Modifier.width(112.dp).height(84.dp).clip(shape)
+        .background(MaterialTheme.colorScheme.surfaceVariant)
+    val placeholder = @Composable {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.DirectionsCar, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    if (url == null) {
+        Box(modifier) { placeholder() }
+        return
+    }
+    SubcomposeAsyncImage(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(url)
+            .addHeader("Referer", "https://www.bilbasen.dk/")
+            .crossfade(true)
+            .build(),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        loading = { placeholder() },
+        error = { placeholder() },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -149,6 +195,28 @@ private fun FilterPanel(
         RangeRow("Km fra", f.kmFrom, "Km til", f.kmTo,
             onFrom = { v -> onFilters { it.copy(kmFrom = v) } },
             onTo = { v -> onFilters { it.copy(kmTo = v) } })
+        RangeRow("Pris fra (kr.)", f.priceFrom, "Pris til (kr.)", f.priceTo,
+            onFrom = { v -> onFilters { it.copy(priceFrom = v) } },
+            onTo = { v -> onFilters { it.copy(priceTo = v) } })
+        ChipGroup("Drivmiddel") {
+            FuelType.entries.forEach { fuel ->
+                FilterChip(
+                    selected = fuel in f.fuels,
+                    onClick = { onFilters { it.copy(fuels = if (fuel in it.fuels) it.fuels - fuel else it.fuels + fuel) } },
+                    label = { Text(fuel.label) },
+                )
+            }
+        }
+        ChipGroup("Gearkasse") {
+            FilterChip(selected = f.gearbox == null, onClick = { onFilters { it.copy(gearbox = null) } }, label = { Text("Alle") })
+            Gearbox.entries.forEach { gb ->
+                FilterChip(
+                    selected = f.gearbox == gb,
+                    onClick = { onFilters { it.copy(gearbox = gb) } },
+                    label = { Text(gb.label) },
+                )
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onSearch, enabled = !loading) {
                 Icon(Icons.Default.Search, contentDescription = null)
@@ -158,6 +226,15 @@ private fun FilterPanel(
             if (loading) OutlinedButton(onClick = onCancel) { Text("Stop") }
             else OutlinedButton(onClick = { onFilters { SearchFilters() } }) { Text("Nulstil") }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChipGroup(label: String, content: @Composable () -> Unit) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { content() }
     }
 }
 
