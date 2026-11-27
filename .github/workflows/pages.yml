@@ -1,0 +1,49 @@
+name: Website (GitHub Pages)
+
+# Builds the app and publishes the download page with the newest APK.
+# One-time setup: repo Settings → Pages → Source: "GitHub Actions".
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests and APK
+        run: ./gradlew testDebugUnitTest assembleDebug
+      - name: Assemble site
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk site/brugtbil-browser.apk
+          size=$(du -m site/brugtbil-browser.apk | cut -f1)
+          sed -i "s/{{VERSION}}/0.2.${GITHUB_RUN_NUMBER}/g; s/{{SIZE}}/${size} MB/g; s/{{DATE}}/$(date -u +%Y-%m-%d)/g" site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

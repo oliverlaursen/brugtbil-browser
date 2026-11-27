@@ -50,3 +50,14 @@ builds it on every push and uploads it as an artifact.
 - Price ranges are based on the first ~10 result pages. Fuel/gearbox filters are applied to
   those pages only, so narrow searches on those may show fewer cars than Bilbasen has.
 - Listings whose fuel type or gearbox can't be read are left out when that filter is on.
+
+## Website
+
+`site/` is a download page published to GitHub Pages by `.github/workflows/pages.yml`
+on every push to `main`. The workflow builds the APK and puts it next to the page as
+`brugtbil-browser.apk`, so the download is always the latest build.
+One-time setup: repository **Settings → Pages → Source: GitHub Actions**.
+The site is then at https://oliverlaursen.github.io/brugtbil-browser/.
+
+Builds are signed with the committed `app/debug.keystore` (Android's standard debug
+passwords) and CI builds number themselves, so a new download installs over the old one.
