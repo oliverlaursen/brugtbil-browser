@@ -3,6 +3,7 @@ package dk.brugtbil.browser
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -54,9 +55,15 @@ class MainActivity : ComponentActivity() {
                     },
                     // The WebView needs a real, phone-sized viewport for Bilbasen to draw
                     // its listing cards, so it fills the screen *behind* the app's own
-                    // (opaque) content and ignores touches.
+                    // (opaque) content and ignores touches. Between searches it is made
+                    // invisible so it isn't redrawn behind every frame of the result list
+                    // (photo look-ups after a search only read the page's data, not its cards).
                     hiddenWebView = {
-                        AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
+                        AndroidView(
+                            factory = { webView },
+                            modifier = Modifier.fillMaxSize(),
+                            update = { it.visibility = if (state.loading) View.VISIBLE else View.INVISIBLE },
+                        )
                     },
                 )
             }
