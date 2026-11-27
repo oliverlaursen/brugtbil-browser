@@ -73,6 +73,33 @@ class BilbasenClient(private val webView: WebView) {
     }
 
     /**
+     * Finds a real car photo for a model none of whose downloaded listings had one (the
+     * dealer hasn't uploaded photos yet). Opens the model's own search page and takes the
+     * first listing there with several photos. Only the page's JSON-LD is needed, so this
+     * returns as soon as it appears. Returns null if nothing suitable shows up.
+     */
+    suspend fun modelPhoto(makeSlug: String, modelSlug: String): String? {
+        val url = "${BilbasenUrls.BASE}/brugt/bil/$makeSlug/$modelSlug?includeengroscvr=true&includeleasing=false"
+        pageLoaded = CompletableDeferred()
+        webView.loadUrl(url)
+        val wantedPath = "/brugt/bil/$makeSlug/$modelSlug"
+        repeat(60) { // up to ~30 s
+            delay(500)
+            val page = runCatching { ListingParser.decodePage(evaluate(ExtractorScript.JS)) }.getOrNull()
+                ?.takeIf { it.url.substringBefore('?').trimEnd('/').endsWith(wantedPath) }
+                ?: return@repeat
+            val listings = page.jsonld.flatMap { ListingParser.fromJsonLd(it) }
+            if (listings.isNotEmpty()) {
+                return listings
+                    .filter { Slugs.baseModel(it.modelSlug.orEmpty()) == Slugs.baseModel(modelSlug) }
+                    .firstOrNull { Aggregator.hasRealPhoto(it) }?.imageUrl
+            }
+            if (pageLoaded.isCompleted && !page.challenge && it > 30) return null
+        }
+        return null
+    }
+
+    /**
      * Debug builds only: saves what each page yielded (and page 1's full HTML) to the app's
      * cache dir, so parsing can be checked against Bilbasen's real markup with
      * `adb shell run-as dk.brugtbil.browser ls cache/bilbasen-debug`.

@@ -7,6 +7,7 @@ import dk.brugtbil.browser.data.BilbasenClient
 import dk.brugtbil.browser.data.Listing
 import dk.brugtbil.browser.data.ModelGroup
 import dk.brugtbil.browser.data.SearchFilters
+import dk.brugtbil.browser.data.Slugs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,9 @@ class MainViewModel : ViewModel() {
 
     private var listings: List<Listing> = emptyList()
     private var lastSearch: SearchFilters? = null
+    /** Photos fetched for models whose listings had none, by [ModelGroup.key]. Kept across searches. */
+    private val photoOverrides = mutableMapOf<String, String>()
+    private val photoMisses = mutableSetOf<String>()
     private var job: Job? = null
 
     fun updateFilters(transform: (SearchFilters) -> SearchFilters) {
@@ -37,7 +41,7 @@ class MainViewModel : ViewModel() {
             // Fuel and gearbox are filtered on the device: re-group the downloaded
             // listings right away instead of waiting for a new search.
             val instant = !s.loading && lastSearch?.withoutLocalOnly() == f.withoutLocalOnly()
-            if (instant) s.copy(filters = f, groups = Aggregator.group(listings, f)) else s.copy(filters = f)
+            if (instant) s.copy(filters = f, groups = Aggregator.group(listings, f, photoOverrides)) else s.copy(filters = f)
         }
     }
 
@@ -56,17 +60,38 @@ class MainViewModel : ViewModel() {
                         searched = true,
                         listingsScanned = listings.size,
                         // Pick up fuel/gearbox changes made while loading.
-                        groups = Aggregator.group(
-                            listings, filters.copy(fuels = it.filters.fuels, gearbox = it.filters.gearbox),
-                        ),
+                        groups = Aggregator.group(listings, localFilters(filters, it.filters), photoOverrides),
                     )
                 }
                 lastSearch = filters
+                fillMissingPhotos(client, filters)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message ?: "Ukendt fejl") }
             }
+        }
+    }
+
+    private fun localFilters(searched: SearchFilters, current: SearchFilters) =
+        searched.copy(fuels = current.fuels, gearbox = current.gearbox, rangeFrom = current.rangeFrom)
+
+    /**
+     * For models where no downloaded listing has a real photo, look one up on the model's
+     * own Bilbasen page, one model at a time, updating the list as photos arrive.
+     */
+    private suspend fun fillMissingPhotos(client: BilbasenClient, searched: SearchFilters) {
+        val all = Aggregator.group(listings, searched.withoutLocalOnly(), photoOverrides)
+        val missing = all.filter { !it.hasGoodPhoto && it.key !in photoMisses }.take(MAX_PHOTO_LOOKUPS)
+        for (g in missing) {
+            // Use a real (un-merged) model slug from the listings so the URL exists.
+            val slug = listings.firstOrNull {
+                it.makeSlug == g.makeSlug && Slugs.baseModel(it.modelSlug.orEmpty()) == g.modelSlug
+            }?.modelSlug ?: g.modelSlug
+            val photo = runCatching { client.modelPhoto(g.makeSlug, slug) }.getOrNull()
+            if (photo == null) { photoMisses += g.key; continue }
+            photoOverrides[g.key] = photo
+            _state.update { s -> s.copy(groups = Aggregator.group(listings, localFilters(searched, s.filters), photoOverrides)) }
         }
     }
 
@@ -77,5 +102,6 @@ class MainViewModel : ViewModel() {
 
     companion object {
         const val MAX_PAGES = 10
+        const val MAX_PHOTO_LOOKUPS = 15
     }
 }

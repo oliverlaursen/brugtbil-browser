@@ -3,7 +3,7 @@
 An Android app (Kotlin + Jetpack Compose) for browsing used cars on [Bilbasen](https://www.bilbasen.dk).
 Instead of showing every listing, it shows **one row per car model** with a picture, the **price range**
 and the count, year range, mileage range and fuel types of the listings that match your filters.
-The picture is picture number 2 of the first matching listing that has one (picture 1 is usually the dealer's branding).
+The picture is the first car photo of the first matching listing with several photos (the dealer's logo is skipped). If no listing of a model has real photos yet (Bilbasen shows a "missing" icon or a dealer placeholder), the app looks up a photo on that model's own Bilbasen page after the search.
 
 ## Filters
 - Brand (Mærke) – dropdown with common brands, or free text
@@ -13,6 +13,7 @@ The picture is picture number 2 of the first matching listing that has one (pict
 - Price from / to
 - Fuel type (Drivmiddel): petrol, diesel, electric, hybrid, plug-in hybrid (pick several)
 - Gearbox (Gearkasse): automatic / manual
+- Electric range (Rækkevidde fra): minimum driving range in km; cards show the range span for EVs and plug-ins
 
 Fuel type and gearbox are worked out from the listing text (e.g. "Benzin", "TDi", "kWh",
 "DSG", "Manuel") and filtered on the phone only, so changing them re-groups the results

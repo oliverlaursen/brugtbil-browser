@@ -17,10 +17,23 @@ object Aggregator {
         if (f.priceTo != null && (l.priceDkk == null || l.priceDkk > f.priceTo)) return false
         if (f.fuels.isNotEmpty() && (l.fuel == null || l.fuel !in f.fuels)) return false
         if (f.gearbox != null && (l.gearbox == null || l.gearbox != f.gearbox)) return false
+        if (f.rangeFrom != null && (l.rangeKm == null || l.rangeKm < f.rangeFrom)) return false
         return true
     }
 
-    fun group(listings: List<Listing>, f: SearchFilters): List<ModelGroup> =
+    /** A listing with a single "photo" is usually a dealer placeholder or a missing-photo icon. */
+    fun hasRealPhoto(l: Listing) = l.imageUrl != null && l.imageCount >= 2 &&
+        !l.imageUrl.substringBefore('?').endsWith(".svg", ignoreCase = true)
+
+    /**
+     * [photoOverrides] maps [ModelGroup.key] to a photo fetched separately for models where
+     * none of the downloaded listings has a real photo.
+     */
+    fun group(
+        listings: List<Listing>,
+        f: SearchFilters,
+        photoOverrides: Map<String, String> = emptyMap(),
+    ): List<ModelGroup> =
         listings
             .asSequence()
             .filter { it.priceDkk != null && it.makeSlug != null && it.modelSlug != null }
@@ -31,6 +44,9 @@ object Aggregator {
                 val prices = items.mapNotNull { it.priceDkk }
                 val years = items.mapNotNull { it.year }
                 val kms = items.mapNotNull { it.km }
+                val ranges = items.mapNotNull { it.rangeKm }
+                val good = items.firstOrNull { hasRealPhoto(it) }?.imageUrl
+                val override = photoOverrides["$make/$model"]
                 ModelGroup(
                     makeSlug = make,
                     modelSlug = model,
@@ -42,10 +58,14 @@ object Aggregator {
                     maxYear = years.maxOrNull(),
                     minKm = kms.minOrNull(),
                     maxKm = kms.maxOrNull(),
-                    // One picture per model: the first listing (in Bilbasen's order) that has one.
-                    // Prefer a listing with several photos: single-photo listings are
-                    // often a dealer placeholder or logo rather than the car.
-                    imageUrl = (items.filter { it.imageCount >= 2 } + items).firstNotNullOfOrNull { it.imageUrl },
+                    // One picture per model: the first listing (in Bilbasen's order) with a
+                    // real photo, else a photo fetched for the model, else whatever there is.
+                    imageUrl = good ?: override ?: items.firstNotNullOfOrNull { l ->
+                        l.imageUrl?.takeUnless { it.substringBefore('?').endsWith(".svg", true) }
+                    },
+                    hasGoodPhoto = good != null || override != null,
+                    minRange = ranges.minOrNull(),
+                    maxRange = ranges.maxOrNull(),
                     fuels = items.mapNotNull { it.fuel }.toSortedSet(),
                 )
             }

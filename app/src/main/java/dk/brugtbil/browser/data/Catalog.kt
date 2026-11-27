@@ -13,7 +13,7 @@ object Catalog {
         Brand("Audi", "audi", listOf("A1", "A3", "A4", "A5", "A6", "Q2", "Q3", "Q4 e-tron", "Q5", "e-tron")),
         Brand("BMW", "bmw", listOf("1-serie", "2-serie", "3-serie", "4-serie", "5-serie", "X1", "X3", "X5", "i3", "i4", "iX", "iX3")),
         Brand("BYD", "byd", listOf("Atto 3", "Dolphin", "Seal")),
-        Brand("Citroën", "citroen", listOf("C1", "C3", "C4", "C5 Aircross", "Berlingo")),
+        Brand("Citroën", "citron", listOf("C1", "C3", "C4", "C5 Aircross", "Berlingo")),
         Brand("Cupra", "cupra", listOf("Born", "Formentor", "Leon")),
         Brand("Dacia", "dacia", listOf("Sandero", "Duster", "Jogger", "Spring")),
         Brand("Fiat", "fiat", listOf("500", "500e", "Panda", "Tipo")),
@@ -56,6 +56,7 @@ object Catalog {
 
     private val aliases = mapOf(
         "volkswagen" to "vw",
+        "citroen" to "citron", // Bilbasen's slug for Citroën
         "mercedesbenz" to "mercedes",
         "mercedes" to "mercedes",
         "landrover" to "land-rover",

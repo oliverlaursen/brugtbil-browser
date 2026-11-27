@@ -130,6 +130,7 @@ private fun ModelRow(g: ModelGroup, onClick: () -> Unit) {
                     range(g.minYear, g.maxYear) { it.toString() },
                     range(g.minKm, g.maxKm, ::km),
                     g.fuels.takeIf { it.isNotEmpty() }?.joinToString("/") { it.label },
+                    range(g.minRange, g.maxRange, ::km)?.let { "$it rækkevidde" },
                 ).joinToString(" · ")
                 Text(details, style = MaterialTheme.typography.bodySmall)
             }
@@ -208,6 +209,10 @@ private fun FilterPanel(
                 )
             }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField("Rækkevidde fra (km)", f.rangeFrom, { v -> onFilters { it.copy(rangeFrom = v) } }, Modifier.weight(1f))
+            Spacer(Modifier.weight(1f))
+        }
         ChipGroup("Gearkasse") {
             FilterChip(selected = f.gearbox == null, onClick = { onFilters { it.copy(gearbox = null) } }, label = { Text("Alle") })
             Gearbox.entries.forEach { gb ->
@@ -238,6 +243,8 @@ private fun ChipGroup(label: String, content: @Composable () -> Unit) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { content() }
     }
 }
+
+private const val MAX_SUGGESTIONS = 8
 
 @Composable
 private fun RangeRow(
@@ -272,7 +279,13 @@ private fun SuggestField(
     enabled: Boolean = true,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val filtered = suggestions.filter { value.isBlank() || it.contains(value, ignoreCase = true) }
+    // Keep the menu short: a long, non-lazy popup is slow to lay out on every keystroke.
+    val filtered = remember(suggestions, value) {
+        suggestions.asSequence()
+            .filter { value.isBlank() || it.contains(value, ignoreCase = true) }
+            .filter { !it.equals(value, ignoreCase = true) }
+            .take(MAX_SUGGESTIONS).toList()
+    }
     ExposedDropdownMenuBox(expanded = expanded && enabled, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
             value = value,

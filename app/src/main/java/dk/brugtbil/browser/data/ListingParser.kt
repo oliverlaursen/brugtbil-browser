@@ -57,6 +57,7 @@ object ListingParser {
                     // JSON-LD photo lists start at the first car photo (no dealer logo).
                     imageUrl = l.imageUrl ?: existing.imageUrl,
                     imageCount = maxOf(l.imageCount, existing.imageCount),
+                    rangeKm = existing.rangeKm ?: l.rangeKm,
                     title = existing.title.ifBlank { l.title },
                 )
             }
@@ -83,6 +84,7 @@ object ListingParser {
             gearbox = parseGearbox(all),
             imageUrl = pickImage(card.images),
             imageCount = card.images.size,
+            rangeKm = parseRange(text),
         )
     }
 
@@ -134,6 +136,15 @@ object ListingParser {
     // "3/2019", "03-2019", or a standalone "2019"
     private val monthYearRe = Regex("""(?<![\d.])(?:0?[1-9]|1[0-2])[/-]((?:19|20)\d{2})(?!\d)""")
     private val yearRe = Regex("""(?<![\d.,/])((?:19[5-9]|20[0-4])\d)(?![\d.,])""")
+
+    // "490 km rækkevidde" / "Rækkevidde: 490 km" / "450 km (WLTP)"
+    private val rangeAfterRe = Regex("""(?<![\d,.])(\d{2,4})\s*km\s*(?:\(WLTP\)\s*)?rækkevidde""", RegexOption.IGNORE_CASE)
+    private val rangeBeforeRe = Regex("""rækkevidde\D{0,20}?(\d{2,4})\s*km""", RegexOption.IGNORE_CASE)
+    private val rangeWltpRe = Regex("""(?<![\d,.])(\d{2,4})\s*km\s*\(WLTP""", RegexOption.IGNORE_CASE)
+
+    fun parseRange(text: String): Int? =
+        (rangeAfterRe.find(text) ?: rangeBeforeRe.find(text) ?: rangeWltpRe.find(text))
+            ?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it in 10..1500 }
 
     fun parsePrice(text: String): Int? =
         priceRe.findAll(text).mapNotNull { toInt(it.groupValues[1]) }.firstOrNull { it >= 1000 }

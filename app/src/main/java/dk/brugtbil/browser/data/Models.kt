@@ -18,6 +18,8 @@ data class Listing(
     /** How many photos the listing has. Listings with a single "photo" are often a
      *  dealer placeholder ("fotografen arbejder") or logo, so they rank last for pictures. */
     val imageCount: Int = 0,
+    /** Electric driving range in km ("490 km rækkevidde"), for EVs and plug-ins. */
+    val rangeKm: Int? = null,
 )
 
 enum class FuelType(val label: String) {
@@ -44,9 +46,11 @@ data class SearchFilters(
     val fuels: Set<FuelType> = emptySet(),
     /** null = both. */
     val gearbox: Gearbox? = null,
+    /** Minimum electric driving range in km; null = any. */
+    val rangeFrom: Int? = null,
 ) {
     /** Filters that are only applied on the device, so changing them needs no new download. */
-    fun withoutLocalOnly() = copy(fuels = emptySet(), gearbox = null)
+    fun withoutLocalOnly() = copy(fuels = emptySet(), gearbox = null, rangeFrom = null)
 
     val brandSlug: String get() = Slugs.slugify(brand)
     val modelSlug: String get() = Slugs.slugify(model)
@@ -66,7 +70,13 @@ data class ModelGroup(
     val maxKm: Int?,
     val imageUrl: String? = null,
     val fuels: Set<FuelType> = emptySet(),
-)
+    val minRange: Int? = null,
+    val maxRange: Int? = null,
+    /** False when no listing in the group has a real photo (see [Listing.imageCount]). */
+    val hasGoodPhoto: Boolean = false,
+) {
+    val key: String get() = "$makeSlug/$modelSlug"
+}
 
 object Slugs {
     private val danish = mapOf('æ' to "ae", 'ø' to "oe", 'å' to "aa", 'é' to "e", 'ë' to "e", 'ö' to "o", 'ü' to "u", 'ä' to "a")
