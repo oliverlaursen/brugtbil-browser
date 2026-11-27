@@ -15,6 +15,25 @@ let shown = PAGE;
 // ---- Filter form <-> state <-> URL ----------------------------------------------------
 
 const NUMBERS = ["yearFrom", "yearTo", "kmFrom", "kmTo", "priceFrom", "priceTo", "rangeFrom"];
+// Shown with thousands separators (100.000); years are left as typed.
+const GROUPED = new Set(["kmFrom", "kmTo", "priceFrom", "priceTo", "rangeFrom"]);
+
+function formatDigits(s) {
+  const d = String(s).replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 8);
+  return d ? nf.format(parseInt(d, 10)) : "";
+}
+
+/** Reformats a number field in place, keeping the cursor after the same digit. */
+function regroup(input) {
+  const caret = input.selectionStart ?? input.value.length;
+  const digitsBefore = input.value.slice(0, caret).replace(/\D/g, "").length;
+  const next = formatDigits(input.value);
+  if (next === input.value) return;
+  input.value = next;
+  let pos = 0;
+  for (let seen = 0; pos < next.length && seen < digitsBefore; pos++) if (/\d/.test(next[pos])) seen++;
+  input.setSelectionRange(pos, pos);
+}
 
 function chip(container, type, name, value, label) {
   const l = document.createElement("label");
@@ -53,7 +72,7 @@ function readUrl() {
   form.brand.value = q.get("maerke") || "";
   fillModels();
   form.model.value = q.get("model") || "";
-  for (const k of NUMBERS) form[k].value = q.get(k) || "";
+  for (const k of NUMBERS) form[k].value = GROUPED.has(k) ? formatDigits(q.get(k) || "") : q.get(k) || "";
   const fuels = (q.get("fuel") || "").split(",");
   form.querySelectorAll("[name=fuel]").forEach((i) => (i.checked = fuels.includes(i.value)));
   const gear = q.get("gear") || "";
@@ -143,6 +162,7 @@ function render() {
 let timer;
 form.addEventListener("input", (e) => {
   if (e.target === form.brand) fillModels();
+  if (GROUPED.has(e.target.name)) regroup(e.target);
   shown = PAGE;
   clearTimeout(timer);
   timer = setTimeout(render, e.target.tagName === "INPUT" && e.target.type !== "checkbox" && e.target.type !== "radio" ? 200 : 0);
