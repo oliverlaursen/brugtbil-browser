@@ -54,7 +54,7 @@ builds it on every push and uploads it as an artifact.
 ## Website
 
 `site/` is a download page published to GitHub Pages by `.github/workflows/pages.yml`
-on every push to `main`. The workflow builds the APK and puts it next to the page as
+on every push to the default branch. The workflow builds the APK and puts it next to the page as
 `brugtbil-browser.apk`, so the download is always the latest build.
 One-time setup: repository **Settings → Pages → Source: GitHub Actions**.
 The site is then at https://oliverlaursen.github.io/brugtbil-browser/.
