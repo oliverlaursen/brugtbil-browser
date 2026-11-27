@@ -8,3 +8,5 @@ captures/
 .kotlin/
 qa-screenshots/
 *.apk
+scraper/node_modules/
+site/data/

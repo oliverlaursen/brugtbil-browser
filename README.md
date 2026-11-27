@@ -53,11 +53,29 @@ builds it on every push and uploads it as an artifact.
 
 ## Website
 
-`site/` is a download page published to GitHub Pages by `.github/workflows/pages.yml`
-on every push to the default branch. The workflow builds the APK and puts it next to the page as
-`brugtbil-browser.apk`, so the download is always the latest build.
-One-time setup: repository **Settings → Pages → Source: GitHub Actions**.
-The site is then at https://oliverlaursen.github.io/brugtbil-browser/.
+The app also runs as a website on GitHub Pages: https://oliverlaursen.github.io/brugtbil-browser/
+(the Android download page is at `android.html`).
+
+A web page can't read Bilbasen directly (browsers block cross-site reads and Bilbasen
+has a JavaScript bot check), so the website works from a **snapshot**:
+
+- `scraper/scrape.mjs` opens Bilbasen's search pages in a headless Chromium (Playwright),
+  reads listing cards and JSON-LD with the same extractor the app uses (`scraper/extract.js`),
+  and writes `site/data/listings.json`. By default it reads 100 pages (about 3,000 listings),
+  one at a time with pauses, then looks up a photo for models that have none.
+- `site/` is a static page (`index.html`, `app.mjs`) that loads that file and filters and
+  groups it instantly in the browser. `site/core.mjs` holds the parsing and grouping logic,
+  shared by the scraper and the page (a port of the app's ListingParser/Aggregator).
+- `.github/workflows/pages.yml` builds the APK, runs the scraper and publishes everything on
+  every push to the default branch and twice a day. If a scrape fails, the previously
+  published data is kept.
+
+Limitations: the data is up to about 12 hours old and covers the first ~3,000 listings in
+Bilbasen's default order, not all of them. Bilbasen may block GitHub's servers. Filters
+on the site apply to the snapshot only.
+
+Run locally: `cd scraper && npm install && npx playwright install chromium && MAX_PAGES=3 npm run scrape`,
+then serve `site/` with any static server. Tests: `cd scraper && npm test`.
 
 Builds are signed with the committed `app/debug.keystore` (Android's standard debug
 passwords) and CI builds number themselves, so a new download installs over the old one.

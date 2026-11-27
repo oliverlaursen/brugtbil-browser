@@ -20,3 +20,5 @@ jobs:
         with:
           name: brugtbil-browser-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Web version tests
+        run: node --test scraper/core.test.mjs

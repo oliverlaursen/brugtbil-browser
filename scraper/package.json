@@ -1,0 +1,7 @@
+{
+  "name": "brugtbil-scraper",
+  "private": true,
+  "type": "module",
+  "scripts": { "scrape": "node scrape.mjs", "test": "node --test core.test.mjs" },
+  "dependencies": { "playwright": "1.63.0" }
+}
