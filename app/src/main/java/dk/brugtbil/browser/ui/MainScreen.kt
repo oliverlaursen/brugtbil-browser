@@ -210,7 +210,7 @@ private fun FilterPanel(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberField("Rækkevidde fra (km)", f.rangeFrom, { v -> onFilters { it.copy(rangeFrom = v) } }, Modifier.weight(1f))
+            NumberField("Min. rækkevidde", f.rangeFrom, { v -> onFilters { it.copy(rangeFrom = v) } }, Modifier.weight(1f), suffix = "km")
             Spacer(Modifier.weight(1f))
         }
         ChipGroup("Gearkasse") {
@@ -258,11 +258,14 @@ private fun RangeRow(
 }
 
 @Composable
-private fun NumberField(label: String, value: Int?, onValue: (Int?) -> Unit, modifier: Modifier) {
+private fun NumberField(
+    label: String, value: Int?, onValue: (Int?) -> Unit, modifier: Modifier, suffix: String? = null,
+) {
     OutlinedTextField(
         value = value?.toString().orEmpty(),
         onValueChange = { s -> onValue(s.filter { it.isDigit() }.take(7).toIntOrNull()) },
-        label = { Text(label) },
+        label = { Text(label, maxLines = 1) },
+        suffix = suffix?.let { { Text(it) } },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = modifier,
