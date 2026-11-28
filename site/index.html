@@ -43,7 +43,11 @@
   .chip input:focus-visible + span { outline: 2px solid var(--accent); }
   button { font: inherit; border: 1px solid var(--border); background: transparent; color: var(--accent);
            border-radius: 999px; padding: 8px 16px; cursor: pointer; font-weight: 600; }
-  .summary { color: var(--muted); margin: 0 0 12px; min-height: 1.4em; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+             flex-wrap: wrap; margin: 0 0 12px; }
+  .summary { color: var(--muted); margin: 0; min-height: 1.4em; }
+  .sort { display: flex; align-items: center; gap: 8px; font-size: .88rem; }
+  .sort select { width: auto; padding: 6px 8px; }
   #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
   .car { display: grid; grid-template-columns: 128px 1fr; gap: 14px; background: var(--surface);
          border-radius: 16px; padding: 12px; text-decoration: none; color: inherit; align-items: center; }
@@ -96,7 +100,20 @@
     <div><button type="reset">Nulstil</button></div>
   </form>
   <main>
-    <p class="summary" id="summary" aria-live="polite">Henter biler…</p>
+    <div class="toolbar">
+      <p class="summary" id="summary" aria-live="polite">Henter biler…</p>
+      <label class="sort">Sortér
+        <select id="sort">
+          <option value="count">Flest biler</option>
+          <option value="price-asc">Laveste pris</option>
+          <option value="price-desc">Højeste pris</option>
+          <option value="year-desc">Nyeste årgang</option>
+          <option value="km-asc">Færrest km</option>
+          <option value="range-desc">Længst rækkevidde</option>
+          <option value="name">Navn (A–Å)</option>
+        </select>
+      </label>
+    </div>
     <div id="results"></div>
     <button class="more" id="more" hidden>Vis flere modeller</button>
   </main>

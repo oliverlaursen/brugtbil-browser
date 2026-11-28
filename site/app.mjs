@@ -12,6 +12,31 @@ let listings = [];
 let modelPhotos = {};
 let shown = PAGE;
 
+// ---- Sorting ----------------------------------------------------------------------------
+
+// Models missing the sorted value (e.g. range for petrol cars) go last.
+const by = (get, dir) => (a, b) => {
+  const x = get(a), y = get(b);
+  if (x == null || y == null) return (x == null) - (y == null);
+  return dir * (x - y);
+};
+const SORTS = {
+  "count": null, // group() already returns most listings first
+  "price-asc": by((g) => g.minPrice, 1),
+  "price-desc": by((g) => g.maxPrice, -1),
+  "year-desc": by((g) => g.maxYear, -1),
+  "km-asc": by((g) => g.minKm, 1),
+  "range-desc": by((g) => g.maxRange, -1),
+  "name": (a, b) => a.name.localeCompare(b.name, "da"),
+};
+const sortSelect = $("#sort");
+
+function sortGroups(groups) {
+  const cmp = SORTS[sortSelect.value];
+  // Ties keep the "most listings first" order (Array.sort is stable).
+  return cmp ? groups.slice().sort(cmp) : groups;
+}
+
 // ---- Filter form <-> state <-> URL ----------------------------------------------------
 
 const NUMBERS = ["yearFrom", "yearTo", "kmFrom", "kmTo", "priceFrom", "priceTo", "rangeFrom"];
@@ -64,6 +89,7 @@ function writeUrl(f) {
   for (const k of NUMBERS) if (f[k] != null) q.set(k, f[k]);
   if (f.fuels.length) q.set("fuel", f.fuels.join(","));
   if (f.gear) q.set("gear", f.gear);
+  if (sortSelect.value !== "count") q.set("sort", sortSelect.value);
   history.replaceState(null, "", q.toString() ? "?" + q : location.pathname);
 }
 
@@ -75,6 +101,7 @@ function readUrl() {
   for (const k of NUMBERS) form[k].value = GROUPED.has(k) ? formatDigits(q.get(k) || "") : q.get(k) || "";
   const fuels = (q.get("fuel") || "").split(",");
   form.querySelectorAll("[name=fuel]").forEach((i) => (i.checked = fuels.includes(i.value)));
+  sortSelect.value = q.get("sort") in SORTS ? q.get("sort") : "count";
   const gear = q.get("gear") || "";
   form.querySelectorAll("[name=gear]").forEach((i) => (i.checked = i.value === gear));
 }
@@ -148,7 +175,7 @@ function card(g) {
 function render() {
   const f = readForm();
   writeUrl(f);
-  const groups = group(listings, f, modelPhotos);
+  const groups = sortGroups(group(listings, f, modelPhotos));
   const matching = groups.reduce((n, g) => n + g.count, 0);
   $("#summary").textContent = `${nf.format(groups.length)} modeller · ${nf.format(matching)} af ${nf.format(listings.length)} annoncer matcher`;
   const list = $("#results");
@@ -169,6 +196,7 @@ form.addEventListener("input", (e) => {
 });
 form.addEventListener("reset", () => setTimeout(() => { fillModels(); shown = PAGE; render(); }));
 form.addEventListener("submit", (e) => e.preventDefault());
+sortSelect.addEventListener("change", () => { shown = PAGE; render(); });
 $("#more").addEventListener("click", () => { shown += PAGE; render(); });
 function setCollapsed(collapsed) {
   form.classList.toggle("collapsed", collapsed);
