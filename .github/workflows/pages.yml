@@ -2,7 +2,8 @@ name: Website (GitHub Pages)
 
 # Publishes the website: the web version (with car data collected from Bilbasen
 # by scraper/scrape.mjs) and the Android download page with the newest APK.
-# Runs on every push to the default branch and twice a day to refresh the data.
+# Runs on every push to the default branch (reusing the published data) and twice a
+# day, or from the Actions tab, to refresh the data.
 # One-time setup: repo Settings → Pages → Source: "GitHub Actions".
 on:
   push:
@@ -47,10 +48,14 @@ jobs:
           mkdir -p site/data
           curl -fsSL "${{ steps.pages.outputs.base_url }}/data/listings.json" -o site/data/listings.json \
             || echo "No published data yet"
+      # A push (code/page change) reuses the published data so it goes live in ~2 min;
+      # the schedule and manual runs refresh the data from Bilbasen.
       - uses: actions/setup-node@v4
+        if: github.event_name != 'push'
         with:
           node-version: 22
       - name: Collect car data from Bilbasen
+        if: github.event_name != 'push'
         continue-on-error: true
         timeout-minutes: 40
         working-directory: scraper

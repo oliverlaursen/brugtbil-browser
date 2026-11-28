@@ -66,8 +66,8 @@ has a JavaScript bot check), so the website works from a **snapshot**:
 - `site/` is a static page (`index.html`, `app.mjs`) that loads that file and filters and
   groups it instantly in the browser. `site/core.mjs` holds the parsing and grouping logic,
   shared by the scraper and the page (a port of the app's ListingParser/Aggregator).
-- `.github/workflows/pages.yml` builds the APK, runs the scraper and publishes everything on
-  every push to the default branch and twice a day. If a scrape fails, the previously
+- `.github/workflows/pages.yml` builds the APK and publishes everything on every push to the
+  default branch (reusing the published car data) and twice a day, when it also runs the scraper. If a scrape fails, the previously
   published data is kept.
 
 Limitations: the data is up to about 12 hours old and covers the first ~3,000 listings in
